@@ -1,0 +1,12 @@
+127.0.0.1	localhost
+127.0.1.1	CT18TES00.tenda.com.br CT18TES00
+10.18.1.9	srvadct18.tenda.com.br srvadct18
+104.41.62.94	adfs.tenda-atacado.com.br
+
+
+# The following lines are desirable for IPv6 capable hosts
+::1     ip6-localhost ip6-loopback
+fe00::0 ip6-localnet
+ff00::0 ip6-mcastprefix
+ff02::1 ip6-allnodes
+ff02::2 ip6-allrouters

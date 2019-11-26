@@ -1,0 +1,26 @@
+#!/bin/bash
+
+cd $HOME
+
+pasta=$(zenity --title="Uso do smb" --text "Criar pasta para uso como ponto de montagem SMB" --entry)
+
+
+if [ -d "$pasta" ]; then
+info=$`zenity --info --text="Pasta já existe! Continuando a montagem..."`
+echo $info
+servidor=$(zenity --title="Uso do smb" --text "Insira o IP do Servidor" --entry)
+grupo=$(zenity --title="Uso do smb" --text "Insira o grupo do Servidor" --entry)
+usuario=$(zenity --title="Uso do smb" --text "Insira o usuário" --entry)
+senha=$(zenity --title="Uso do smb" --text "Insira a senha" --password)
+else
+mkdir $pasta
+servidor=$(zenity --title="Uso do smb" --text "Insira o IP do Servidor" --entry)
+grupo=$(zenity --title="Uso do smb" --text "Insira o grupo do Servidor" --entry)
+usuario=$(zenity --title="Uso do smb" --text "Insira o usuário" --entry)
+senha=$(zenity --title="Uso do smb" --text "Insira a senha" --password)
+fi
+
+
+sudo mount -t cifs -s -o username=$usuario,password=$senha,rw //$servidor/$grupo $HOME/$pasta
+
+nemo $HOME/$pasta

@@ -1,0 +1,1603 @@
+#!/bin/sh
+
+#********************************************************
+#*                                                      *
+#*   Copyright (C) Microsoft. All rights reserved.      *
+#*                                                      *
+#********************************************************
+
+#set -x
+
+NOSTART=0
+HTTPS_CAPABLE=0
+NOCRLCHECK=0
+NOOUTPUT=1
+ALL_YES=0
+CLEAN_INSTALL=0
+KEEP_DB=0
+OUTFILE=/dev/null
+LOGGINGDIR=/var/opt/microsoft
+IGNORE_SHA256_VALIDATION_PARAM=0
+TH_RETRYINTERVAL=0
+TH_MAXRETRIES=0
+
+# Determine how echo should work.
+ECHO_FLAG="-e"
+
+if [ -n "`echo -e "\n"`" ]; then 
+    ECHO_FLAG=""
+fi
+
+if [ -n "$TMPDIR" ]; then
+  echo "Using alternate installation working directory at $TMPDIR"
+else
+  TMPDIR=/tmp
+fi
+TMPWRKDIR=$TMPDIR
+
+usage()
+{
+cat <<-END
+
+    This script installs the Microsoft System Center
+    Configuration Manager agent for Linux/Unix.
+
+    Usage:
+      install -mp <mp hostname> -sitecode <site code> [-dir <install directory>] [-nostart] [-clean] [-keepdb] [-rootkeypath <file>] [-sitesigningcert <file>] [-fsp <fsp hostname> ][-NoCRLCheck] [-UsePKICert <file>] [-certpw <PKI cert passwd>][-httpport <port number> ] [ -httpsport <port number> ] [ -logdir <logfile directory> ] <archive file>
+
+      -clean                  On a reinstall, completely remove the earlier version.
+      -certpw                 password for PKI certificate
+      -dir <directory>        Directory in which to install product.  Default: /opt/microsoft.
+      -fsp <fsp hostname>     Specifies a fallback status point.
+      -httpport               Specifies port client should use when communicating over http.
+      -httpsport              Specifies port client should use when communicating over https.
+      -keepdb                 On a reinstall, preserve the local database.
+      -mp <hostname>          Management Point hostname.
+      -NoCRLCheck             Specifies that a client should not check the certificate 
+                              revocation list (CRL) when it communicates over HTTPS by using a PKI
+                              certificate.
+      -nostart                Install the agent, but do not start it.
+      -rootkeypath <file>     The location of the Trusted Root Key file
+      -sitecode <sitecode>    The site code for the ConfigMgr server supplied with -mp.
+      -sitesigningcert <file> The site signing certificate.
+      -UsePKICert <file>      Use the supplied X509 certificate in all communications
+      -rootcerts              Use the supplied additional root certificates for X509 certificate
+                              validation.  May be list of comma-separated files.
+      -logdir                 Directory in which the log file is placed, Default: /var/opt/microsoft
+      -ignoreSHA256validation Ignore all SHA256 based validations. Please consult the product documentation for security impact.
+      -CRL                    Import CRLs for certification validation as comma-separated list. 
+      -ad <AD site name>      Name of the Active Directory site the server should use for Software Distribution content download.
+                              -ad is an optional parameter.  If specified, it may be set to ?, which tells the server to 
+                              determine the AD site to use based on IP address
+      -fuid                   Force a unique ID regeneration of the client. The client will have to re-register.
+
+END
+}
+
+
+
+#==================================================#
+#        Basic Functions for Determining OS        #
+#==================================================#
+
+VERSION=
+PATCH=
+PLATFORM=
+ARCH=
+
+SuSE_Release="/etc/SuSE-release"
+SUSE_Release="/etc/SUSE-release"
+RH_Release="/etc/redhat-release"
+FED_Release="/etc/fedora-release"
+
+
+GetARCHInternal() {
+
+    case "$PLATFORM" in
+        MacOS | Hpux | Universal | RHEL | SLES)
+            ARCH=`uname -m`
+        ;;
+
+        *)
+            ARCH=`uname -p`
+        ;;
+    esac    
+
+    case $ARCH in
+
+        x86_64 )
+            ARCH=x64
+        ;;
+
+        i386|i486|i586|i686 )
+            ARCH=x86;
+        ;;
+
+        9000/*)
+            ARCH=PA
+        ;;
+
+        ia64)
+            ARCH=i64
+        ;;
+
+        ppc|ppc64|powerpc)
+            ARCH=ppc
+        ;;
+
+    esac
+}
+
+
+GetLinuxInfo() {
+
+    OSName=`/bin/egrep -o 'Red Hat Enterprise Linux AS|Red Hat Enterprise Linux ES|Red Hat Enterprise Linux|Red Hat Enterprise Linux Server|Red Hat Enterprise Client|Red Hat Enterprise Desktop|SUSE Linux Enterprise Desktop|SUSE Linux Enterprise Server|SUSE LINUX Enterprise Server' $1`
+
+    case $OSName in
+
+        "Red Hat Enterprise Linux Server" | "Red Hat Enterprise Linux ES" | "Red Hat Enterprise Linux AS" )
+            PLATFORM=RHEL
+            if [ "$includePatchInfo" = "true" ]; then
+                VERSION=`grep "$OSName" $1 | sed  's/[^0-9]*//g'`
+            else
+                VERSION=`grep "$OSName" $1 | sed s/.*release\ // | sed s/[\.\ ].*//`
+            fi
+        ;;
+
+        "SUSE LINUX Enterprise Server"|"SUSE Linux Enterprise Server")
+            PLATFORM=SLES
+            VERSION=`grep VERSION "$1" | sed 's/[ \t]//g;s/.*=//'`
+            if [ "$includePatchInfo" = "true" ]; then
+                PATCH=`grep PATCH $1 | sed 's/[ \t]//g;s/.*=//'`
+            fi
+        ;;
+
+        * )
+            PLATFORM=Universal
+            VERSION=
+            ;;
+
+        esac
+}
+
+
+GetARCH()
+{
+    case `uname -s` in
+
+        Linux )
+            if [ -r $SuSE_Release ]; then
+                GetLinuxInfo "$SuSE_Release"
+                # after the dust settles, we can remove this ALTPLATFORM and ALTVERSION logic
+                # and just simply install only universal for supported platforms.
+                if [ "$VERSION" != "9" ]; then
+                    ALTPLATFORM=Universal
+                    ALTVERSION=
+                fi
+            elif [ -r $SUSE_Release ]; then
+                GetLinuxInfo "$SUSE_Release"
+                if [ "$VERSION" != "9" ]; then
+                    ALTPLATFORM=Universal
+                    ALTVERSION=
+                fi
+            elif [ -r $RH_Release ]; then
+                GetLinuxInfo "$RH_Release"
+                if [ "$VERSION" != "4" ]; then
+                    ALTPLATFORM=Universal
+                    ALTVERSION=
+                fi
+            else
+                PLATFORM=Universal
+                VERSION=
+            fi
+        ;;
+
+        HP-UX )
+            VERSION=`uname -r`
+            PLATFORM=Hpux
+        ;;
+
+        AIX )
+            VERSION=`oslevel | sed 's/\.//g;s/0//g'`
+            PLATFORM=Aix
+        ;;
+
+        SunOS )
+            PLATFORM=Sol
+            VERSION=`uname -r | sed 's/[0-9]\.//'`
+        ;;
+
+        Darwin )
+            PLATFORM=MacOS
+            if [ "$includePatchInfo" = "true" ]; then
+                VERSION=`sw_vers -productVersion | sed 's/[^0-9]*//g'`
+            else
+                VERSION=`sw_vers -productVersion | sed 's/\([0-9][0-9]\)\.\([0-9]\)\.\([0-9]\)/\1\2/;s/[^0-9]*//g'`
+            fi
+
+        ;;
+
+        *)
+            echo "Unknown"
+            exit 0
+            ;;
+
+        esac
+
+    GetARCHInternal
+
+    OS=${PLATFORM}${VERSION}${PATCH}${ARCH}
+    ALTOS=${ALTPLATFORM}${ALTVERSION}${PATCH}${ARCH}
+}
+
+
+start_configmgr()
+{
+    case "$OS" in
+
+        Aix* )
+            startsrc -s omiserver
+
+            if [ $? -ne 0 ]; then
+                echo "OMI Server failed to start properly."
+                exit 7
+            fi
+
+            startsrc -s ccmexec
+
+            if [ $? -ne 0 ]; then
+                echo "ConfigMgr Agent failed to start properly."
+                exit 7
+            fi
+        ;;
+
+        RHEL*|Hpux*|SLES*|Sol9*|Universal*)
+            if [ $NOOUTPUT -eq 0 ]; then
+                $CMINSTALLDIR/bin/ccmexec &
+            else
+                $CMINSTALLDIR/bin/ccmexec 2>&1 > /dev/null &
+            fi
+
+            if [ $? -ne 0 ]; then
+                echo "ConfigMgr Agent failed to start properly."
+                exit 7
+            fi
+        ;;
+        
+        Sol10*|Sol11* )
+            service_action_delay svc:/application/management/omiserver disabled
+            service_action_delay svc:/application/management/ccmexecd disabled
+            svcadm enable -s svc:/application/management/omiserver svc:/application/management/ccmexecd
+            if [ $? -ne 0 ]; then
+                echo "ConfigMgr Agent failed to start properly."
+                exit 7
+            fi
+        ;;
+
+        *)
+            echo "Error: Unable to determine proper boot scripts for platform: $OS"
+        ;;
+
+    esac
+}
+
+
+stop_configmgr()
+{
+    case "$OS" in
+
+        Aix* )
+            stopsrc -s ccmexec
+            stopsrc -s omiserver
+            sleep 5
+        ;;
+
+        RHEL*|Hpux*|SLES*|Sol9*|Universal*)
+            $CMINSTALLDIR/bin/ccmexec -s
+            sleep 4
+        ;;
+        
+        Sol10*|Sol11* )
+            svcs -l ccmexecd  2>&1 > /dev/null
+            if [ $? -eq 0 ]; then
+                svcadm disable -s svc:/application/management/ccmexecd
+                service_action_delay svc:/application/management/ccmexecd disabled
+            fi
+
+            svcs -l omiserver  2>&1 > /dev/null
+            if [ $? -eq 0 ]; then
+                svcadm disable -s svc:/application/management/omiserver
+                service_action_delay svc:/application/management/omiserver disabled
+            fi
+        ;;
+
+        *)
+            echo "Error: Unable to determine proper boot scripts for platform: $OS"
+        ;;
+
+    esac
+}
+
+
+validate_build_architecture()
+{
+    if [ -d "$TMPWRKDIR/cmetc" ]; then
+        rm -rf "$TMPWRKDIR/cmetc"
+    fi
+
+    mkdir $TMPWRKDIR/cmetc
+
+    (cd "$TMPWRKDIR/cmetc"; tar xf $TARFILE etc/buildarch)
+    buildarch=`cat $TMPWRKDIR/cmetc/etc/buildarch`
+    rm -rf $TMPWRKDIR/cmetc
+    if [ "$OS" != "$buildarch" ]; then
+        if [ "$ALTOS" != "$buildarch" ]; then
+            echo "The OS/Version/Architecture of this archive file does not match this system, exiting..."
+            exit 1
+        else
+            # this is a universal build
+            OS=$ALTOS
+            PLATFORM=$ALTPLATFORM
+            VERSION=$ALTVERSION
+        fi
+    fi
+}
+
+
+cleanup_failed_install()
+{
+    # Make certain you can't run a "failed" install
+    cd $INSTALLDIR
+    # Safer to break all the links, instead of blindy removing everything.
+    rm -f $INSTALLDIR/configmgr/bin/start
+}
+
+# CreateOpenSSLLinksIfNecessary is basically a copy from the OM install process.  It creates links in 
+# any given directory to the install system's ssl and crypto libraries (in case they have slightly different names) 
+# so that our libraries and programs will be able to load them.
+#
+# \params $1 should be the directory to create these symbolic links
+CreateOpenSSLLinksIfNecessary()
+{
+    if [ "$ARCH" = "x86" ]; then
+        DEFAULT_SSL_LOCATION="/usr/lib"
+        DIR_LIST="/lib/ /usr/lib/ /lib/i386-linux-gnu/ /usr/lib/i386-linux-gnu/"
+    else
+        DEFAULT_SSL_LOCATION="/usr/lib64"
+        DIR_LIST="/lib64/ /usr/lib64/ /lib/x86_64-linux-gnu/ /usr/lib/x86_64-linux-gnu/"
+    fi
+
+    LIBCRYPTO_FILE=
+    LIBSSL_FILE=
+    SSL_VERSION=`openssl version | awk '{print $2}'`
+    SSL_VERSION_SUBS=`echo ${SSL_VERSION} | awk -F - '{print $1}'`
+	EXT_LIST="${SSL_VERSION} `echo ${SSL_VERSION} | tr -d A-Za-z` ${SSL_VERSION_SUBS} `echo ${SSL_VERSION_SUBS} | tr -d A-Za-z`"
+    case "$SSL_VERSION" in
+        1.0.*)
+            EXT_LIST=${EXT_LIST}" 1.0.0"
+            ;;
+    esac
+    
+    if [ ! -e ${DEFAULT_SSL_LOCATION}/libcrypto.so -o ! -e ${DEFAULT_SSL_LOCATION}/libssl.so ]; then
+      for dir in ${DIR_LIST}; do
+          for ext in ${EXT_LIST}; do
+              echo Checking existence of ${dir}libssl.so.${ext} and ${dir}libcrypto.so.${ext} ...
+              if [ -e ${dir}libssl.so.${ext} -a -e ${dir}libcrypto.so.${ext} ]; then
+                  LIBCRYPTO_FILE=${dir}libcrypto.so.${ext}
+                  LIBSSL_FILE=${dir}libssl.so.${ext}
+                  echo "  Found $LIBSSL_FILE and $LIBCRYPTO_FILE ..."
+                  break
+              fi
+          done
+          [ -n "$LIBCRYPTO_FILE" -a -n "$LIBSSL_FILE" ] && break
+      done
+      if [ -z "${LIBCRYPTO_FILE}" -o -z "${LIBSSL_FILE}" ]; then
+          echo "Unable to find openssl libraries associated with openssl version: ${SSL_VERSION}"
+          exit 1
+      fi
+    fi
+    if [ -z "$LIBCRYPTO_FILE" -a -z "$LIBSSL_FILE" ]; then
+      LIBCRYPTO_FILE=${DEFAULT_SSL_LOCATION}/libcrypto.so
+      LIBSSL_FILE=${DEFAULT_SSL_LOCATION}/libssl.so
+    fi
+
+    SSL_LIBDIR=$1
+    case $SSL_VERSION in
+      0.9.8*)
+        rm -f ${SSL_LIBDIR}/libcrypto.so.0.9.8 2> /dev/null
+        rm -f ${SSL_LIBDIR}/libssl.so.0.9.8 2> /dev/null
+        ln -s ${LIBCRYPTO_FILE} ${SSL_LIBDIR}/libcrypto.so.0.9.8
+        ln -s ${LIBSSL_FILE} ${SSL_LIBDIR}/libssl.so.0.9.8
+        ;;
+      1.0.*)
+        rm -f ${SSL_LIBDIR}/libcrypto.so.1.0.0 2> /dev/null
+        rm -f ${SSL_LIBDIR}/libssl.so.1.0.0 2> /dev/null
+        CREATE_DEFAULT_LINKS=1
+        if [ -L ${DEFAULT_SSL_LOCATION}/libssl.so.10 -a -L ${DEFAULT_SSL_LOCATION}/libcrypto.so.10 ]; then
+            SSL_LINK=`readlink ${DEFAULT_SSL_LOCATION}/libssl.so.10`
+            CRYPTO_LINK=`readlink ${DEFAULT_SSL_LOCATION}/libcrypto.so.10`
+            if [ "${SSL_LINK}" = "`basename ${LIBSSL_FILE}`" -a "${CRYPTO_LINK}" = "`basename ${LIBCRYPTO_FILE}`" ]; then
+                ln -s ${DEFAULT_SSL_LOCATION}/libcrypto.so.10 ${SSL_LIBDIR}/libcrypto.so.1.0.0
+                ln -s ${DEFAULT_SSL_LOCATION}/libssl.so.10 ${SSL_LIBDIR}/libssl.so.1.0.0
+                CREATE_DEFAULT_LINKS=0
+            fi
+        fi
+        if [ "${CREATE_DEFAULT_LINKS}" = "1" ]; then
+            ln -s ${LIBCRYPTO_FILE} ${SSL_LIBDIR}/libcrypto.so.1.0.0
+            ln -s ${LIBSSL_FILE} ${SSL_LIBDIR}/libssl.so.1.0.0
+        fi
+        ;;
+    esac
+}
+
+check_prerequisites()
+{
+    echo "Checking Prerequisites..."
+    # Need to extract arch from archive file...
+    case "$OS" in
+        Sol10* )
+            # Don't bother checking, just add it here. OMI requires it.
+            PATH=$PATH:/usr/sfw/bin
+            export PATH
+            pkginfo -l SUNWopenssl-libraries 2>&1 > /dev/null
+            if [ $? -ne 0 ]; then
+                echo "Unable to locate required package: SUNWopenssl-libraries"
+                echo "Please install the package prior to proceeding."
+                exit 1;
+            fi
+        ;;
+    esac
+
+        # Running OpenSSL Validator
+        # Create temp working dir
+        if [ -d "$TMPWRKDIR/cmetc" ]; then
+            rm -rf "$TMPWRKDIR/cmetc"
+        fi
+
+
+        mkdir $TMPWRKDIR/cmetc
+        (cd "$TMPWRKDIR/cmetc"; tar -xf $TARFILE $TMPBINDIR/preinstallvalidator)
+
+        if [ "$PLATFORM" = "Universal" ]; then
+            CreateOpenSSLLinksIfNecessary $TMPWRKDIR/cmetc/$TMPBINDIR
+            export LD_LIBRARY_PATH=$TMPWRKDIR/cmetc/$TMPBINDIR:$LD_LIBRARY_PATH
+        fi
+
+        # Run OpenSSL Validator
+        echo "Running preinstall validator"
+        $TMPWRKDIR/cmetc/$TMPBINDIR/preinstallvalidator
+        if [ $? -ne 0 ]; then
+            if [ $IGNORE_SHA256_VALIDATION_PARAM -eq 0 ]; then
+                echo "Pre-Install validator failed. Please check the version of OpenSSL with CM installation requirements."
+                exit 1
+            fi
+        else
+            if [ $IGNORE_SHA256_VALIDATION_PARAM -eq 1 ]; then
+                echo "You may not specify ignoreSHA256validation on a machine that supports SHA256.  This option will be ignored."
+                IGNORE_SHA256_VALIDATION_PARAM=0
+                export IGNORE_SHA256_VALIDATION_PARAM
+            fi
+        fi
+        IGNORE_SHA256_VALIDATION=$IGNORE_SHA256_VALIDATION_PARAM
+        export IGNORE_SHA256_VALIDATION
+        
+        # Cleanup
+        rm -rf $TMPWRKDIR/cmetc
+
+}
+
+
+service_action_delay()
+{
+    case "$OS" in
+        Sol1* )
+            COUNT=0
+            while [ $COUNT -lt 15 ]; do
+                /usr/bin/svcs -H $1 2> /dev/null | grep -i $2 > /dev/null 2>&1
+                [ $? -eq 0 ] && break
+                echo "Waiting for service: $1 ..."
+                sleep 2
+                COUNT=`expr $COUNT + 1`
+            done
+        ;;
+
+    esac
+}
+
+
+configure_boot_startup()
+{
+    case "$OS" in
+        Aix* )
+            # Verify that any remaining related service is removed.
+            rmssys -s ccmexec 2>&1 > /dev/null
+            rmssys -s omiserver 2>&1 > /dev/null
+
+            # Check if there are inittab entries
+            grep ccmexec /etc/inittab 2>&1 > /dev/null
+
+            if [ $? -eq 0 ]; then 
+                rmitab ccmexec 2>&1 > /dev/null
+            fi 
+
+            grep omiserver /etc/inittab 2>&1 > /dev/null
+
+            if [ $? -eq 0 ]; then 
+                rmitab omiserver 2>&1 > /dev/null
+            fi 
+
+            sed -e "s@<OMI_HOME>@$OMIINSTALLDIR@" $CMINSTALLDIR/scripts/omiserver.aix > $OMIINSTALLDIR/bin/omiserverd
+
+            chmod +x $OMIINSTALLDIR/bin/omiserverd
+
+            mkssys -s omiserver -p $OMIINSTALLDIR/bin/omiserverd -u root -S -n 15 -f 9 -G scxcm
+
+            if [ $? -ne 0 ]; then 
+                echo "An error occured while creating the omiserver subsystem."
+                exit 129
+            fi 
+
+            sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.aix > $CMBIN/ccmexecd
+
+            chmod +x $CMBIN/ccmexecd
+
+            mkssys -s ccmexec -p $CMBIN/ccmexecd -u root -S -n 15 -f 9 -G scxcm
+
+            if [ $? -ne 0 ]; then 
+                echo "An error occured while creating the ccmexec subsystem."
+                exit 129
+            fi
+
+            mkitab "omiserver:2:once:/usr/bin/startsrc -s omiserver > /dev/console 2>&1"
+
+            if [ $? -ne 0 ]; then
+                echo "An error occurred while creating omiserver inittab entry."
+                exit 129
+            fi
+
+            mkitab "ccmexec:2:once:/usr/bin/startsrc -s ccmexec > /dev/console 2>&1"
+
+            if [ $? -ne 0 ]; then
+                echo "An error occurred while creating ccmexec inittab entry."
+                exit 129
+            fi
+        ;;
+
+        Hpux* )
+            sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.hpux > /sbin/init.d/ccmexecd
+            chmod 755 /sbin/init.d/ccmexecd
+
+            links="/sbin/rc1.d/K560ccmexecd /sbin/rc2.d/S889ccmexecd"
+
+            for i in $links
+            do
+                if [ -h $i ]; then
+                    rm $i
+                fi
+
+                ln -s /sbin/init.d/ccmexecd $i
+            done
+        ;;
+
+        RHEL*)
+            if [ -x /usr/lib/lsb/install_initd ]; then
+                sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.rhel > /etc/init.d/ccmexecd
+                chmod 755 /etc/init.d/ccmexecd
+                /usr/lib/lsb/install_initd /etc/init.d/ccmexecd
+                if [ $? -ne 0 ]; then
+                    echo "Error configuring boot scripts... exiting."
+                    exit 61
+                fi
+            else
+                echo "Required utility /usr/lib/lsb/install_initd was not found.  Exiting..."
+                exit 62
+            fi
+        ;;
+        
+        SLES* )
+            if [ -x /usr/lib/lsb/install_initd ]; then
+                sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.sles > /etc/init.d/ccmexecd
+                chmod 755 /etc/init.d/ccmexecd
+                /usr/lib/lsb/install_initd /etc/init.d/ccmexecd
+                if [ $? -ne 0 ]; then
+                    echo "Error configuring boot scripts... exiting."
+                    exit 61
+                fi
+            else
+                echo "Required utility /usr/lib/lsb/install_initd was not found.  Exiting..."
+                exit 62
+            fi
+        ;;
+        
+        Sol9* )
+            sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.sol9 > /etc/init.d/ccmexecd
+            chmod 755 /etc/init.d/ccmexecd
+
+            links="/etc/rc0.d/K40ccmexecd /etc/rc2.d/S74ccmexecd"
+
+            for i in $links
+            do
+                if [ -h $i ]; then
+                    rm $i
+                fi
+
+                ln -s /etc/init.d/ccmexecd $i
+            done
+        ;;
+
+        Sol10* )
+            sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.sol10 > $CMBIN/ccmexecd
+            chmod 755 $CMBIN/ccmexecd
+
+            sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexecd.xml > /var/svc/manifest/application/management/ccmexecd.xml
+            if [ -f /var/svc/manifest/application/management/ccmexecd.xml ]; then
+                svccfg import /var/svc/manifest/application/management/ccmexecd.xml
+                if [ $? -ne 0 ]; then
+                    echo "Error installing ccmexecd service..."
+                    exit 63
+                fi
+            else
+                echo "Error: Unable to locate ccmexecd.xml"
+            fi
+
+            sed -e "s@<OMI_HOME>@$OMIINSTALLDIR@" $CMINSTALLDIR/scripts/omiserver.xml > /var/svc/manifest/application/management/omiserver.xml
+            if [ -f /var/svc/manifest/application/management/omiserver.xml ]; then
+                svccfg import /var/svc/manifest/application/management/omiserver.xml
+                if [ $? -ne 0 ]; then
+                    echo "Error installing omiserver service..."
+                    exit 63
+                fi
+            else
+                echo "Error: Unable to locate omiserver.xml"
+            fi
+			
+            # The two lines below cannot go into any future releases, only this one.
+            svccfg -s ccmexecd delprop omiserverd 2> /dev/null
+			svcadm refresh ccmexecd
+        ;;
+
+        Sol11* )
+            sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.sol10 > $CMBIN/ccmexecd
+            chmod 755 $CMBIN/ccmexecd
+
+            sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexecd.xml > /var/svc/manifest/application/management/ccmexecd.xml
+            sed -e "s@<OMI_HOME>@$OMIINSTALLDIR@" $CMINSTALLDIR/scripts/omiserver.xml > /var/svc/manifest/application/management/omiserver.xml
+            if [ -f /var/svc/manifest/application/management/ccmexecd.xml -a -f /var/svc/manifest/application/management/omiserver.xml ]; then
+                svcadm restart svc:/system/manifest-import
+                if [ $? -ne 0 ]; then
+                    echo "Error installing services..."
+                    exit 63
+                fi
+
+                service_action_delay svc:/system/manifest-import online
+            else
+                echo "Error: Unable to locate either ccmexecd.xml or omiserver.xml"
+            fi
+        ;;
+
+        Universal* )
+            # check for /usr/lib/lsb/install_initd, then /usr/sbin/update-rc.d
+            if [ -x /usr/lib/lsb/install_initd ]; then
+                sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.universal > /etc/init.d/ccmexecd
+                chmod 755 /etc/init.d/ccmexecd
+                /usr/lib/lsb/install_initd /etc/init.d/ccmexecd
+                if [ $? -ne 0 ]; then
+                    echo "Error configuring boot scripts for lsb... exiting."
+                    exit 61
+                fi
+            elif [ -x /usr/sbin/update-rc.d ]; then
+                sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.universal > /etc/init.d/ccmexecd
+                chmod 755 /etc/init.d/ccmexecd
+                /usr/sbin/update-rc.d ccmexecd defaults
+                if [ $? -ne 0 ]; then
+                    echo "Error configuring boot scripts for update-rc... exiting."
+                    exit 61
+                fi
+            elif [ -x /sbin/chkconfig ]; then
+                sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/scripts/ccmexec.universal > /etc/init.d/ccmexecd
+                chmod 755 /etc/init.d/ccmexecd
+                chkconfig --add ccmexecd > /dev/null
+                if [ $? -ne 0 ]; then
+                    echo "Error configuring boot scripts for chkconfig... exiting."
+                    exit 61
+                fi
+            else
+                echo "Unable to find /usr/lib/lsb/install_initd, /usr/sbin/update-rc.d, or /sbin/chkconfig.  At least one is necessary for installation. Exiting..."
+                exit 62
+            fi
+        ;;
+
+        *)
+            echo "Error: Unable to determine proper boot scripts for platform: $OS"
+        ;;
+
+    esac
+}
+
+configure_reset_scripts()
+{
+    sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/bin/reset_policy.sh > $CMINSTALLDIR/bin/reset_policy.tmp
+    mv $CMINSTALLDIR/bin/reset_policy.tmp $CMINSTALLDIR/bin/reset_policy.sh
+    sed -e "s@<CM_HOME>@$CMINSTALLDIR@" $CMINSTALLDIR/bin/reset_hinv.sh > $CMINSTALLDIR/bin/reset_hinv.tmp
+    mv $CMINSTALLDIR/bin/reset_hinv.tmp $CMINSTALLDIR/bin/reset_hinv.sh
+}
+
+#==================================================#
+#                 Script Begins Here               #
+#==================================================#
+
+GetARCH
+
+case "$OS" in
+    Sol11*)
+        whoami=`/usr/bin/whoami`
+    ;;
+
+    Sol*)
+        whoami=`/usr/ucb/whoami`
+    ;;
+    
+    *)
+        whoami=`whoami`
+    ;;
+esac
+
+# Script begins here.
+if [ "$whoami" != "root" ]; then
+    echo "You must be root to install this product."
+    exit 2
+fi
+
+INSTALLDIR=/opt/microsoft
+SIGN_CERT_PATH=""
+SIGN_CERT_PASSWORD=""
+ADDL_ROOT_CERTS=""
+SITE_SIGN_CERT_PATH=""
+CRL_LIST=""
+
+# Parse Command Line Arguments
+while [ $# -ge 1 ]; do
+    case $1 in
+
+        -dir )
+            INSTALLDIR=$2
+            shift
+        ;;
+
+        -fsp )
+            FSP_PARAM=$2
+            shift
+        ;;
+
+        -rootkeypath )
+            case $2 in
+                /*)
+                    ROOT_KEY_PATH=$2
+                ;;
+                *)
+                    ROOT_KEY_PATH=`pwd`"/"$2
+                ;;
+            esac
+            shift
+        ;;
+
+        -sitecode )
+            SITECODE_PARAM=`echo $2 | tr "[a-z]" "[A-Z]"`
+            shift
+        ;;
+
+        -clean )
+            if [ $KEEP_DB -ne 0 ]; then
+                echo "-clean is incompatible with -keepdb, exiting..."
+                exit 50
+            fi
+            CLEAN_INSTALL=1
+        ;;
+
+        # In spite of this being the default behavior, this option is necessary
+        # so that we can differentiate the default behavior from user selected
+        # behavior. The latter case, we can skip prompting for what to do on 
+        # re-install.
+        -keepdb )
+            if [ $CLEAN_INSTALL -ne 0 ]; then
+                echo "-keepdb is incompatible with -clean, exiting..."
+                exit 51
+            fi
+            KEEP_DB=1
+        ;;
+
+        -debug )
+            DEBUG=1
+            #set -x
+        ;;
+
+        -logdir )
+            LOGGINGDIR=$2
+            shift
+            ;;
+
+        -mp )
+            MP_PARAM=$2
+            shift
+        ;;
+
+        -nostart )
+            NOSTART=1
+        ;;
+
+        -showoutput )
+            NOOUTPUT=0
+        ;;
+
+        -httpport )
+            HTTP_PORT_PARAM=$2
+            shift;
+        ;;
+            
+        -httpsport )
+            HTTPS_PORT_PARAM=$2
+            shift;
+        ;;
+            
+        -UsePKICert )
+            HTTPS_CAPABLE=1
+            case $2 in
+                /*)
+                    SIGN_CERT_PATH=$2
+                ;;
+                *)
+                    SIGN_CERT_PATH=`pwd`"/"$2
+                ;;
+            esac
+        shift
+        ;;
+
+        -rootcerts )
+            case $2 in
+                /*)
+                    ADDL_ROOT_CERTS=$2
+                ;;
+                *)
+                    ADDL_ROOT_CERTS=`pwd`"/"$2
+                ;;
+            esac
+        shift
+        ;;
+
+        -NoCRLCheck )
+            NOCRLCHECK=1
+        ;;
+
+        -certpw )
+            SIGN_CERT_PASSWORD=$2
+            shift
+        ;;
+
+        -sitesigningcert )
+            case $2 in
+                /*)
+                    SITE_SIGN_CERT_PATH=$2
+                ;;
+                *)
+                    SITE_SIGN_CERT_PATH=`pwd`"/"$2
+                ;;
+            esac
+        shift
+        ;;
+
+        -ignoreSHA256validation )
+            IGNORE_SHA256_VALIDATION_PARAM=1
+        ;;
+
+        -CRL )
+            case $2 in
+                /*)
+                    CRL_LIST=$2
+                ;;
+                *)
+                    CRL_LIST=`pwd`"/"$2
+                ;;
+            esac
+        shift
+        ;;
+
+        -TH_RetryInterval )
+            TH_RETRYINTERVAL=$2
+            shift;
+        ;;
+
+        -TH_MaxRetries )
+            TH_MAXRETRIES=$2
+            shift;
+        ;;
+
+    -* )
+        usage
+        exit 1
+        ;;
+
+    *)
+        TARFILE=$1
+
+        # Compute absolute path of archive file...
+        tarrootdir=`dirname $TARFILE`
+
+        # If directory does not start with leading slash..
+        echo $tarrootdir | grep "^/" 2>&1 > /dev/null
+        if [ $? -ne 0 ]; then
+
+        if [ ! -d "$tarrootdir" ]; then
+            echo "Archive file directory does not exist..."
+            exit 1
+        fi
+                
+        tarrootdir=`(cd $tarrootdir; pwd)`
+        fi
+
+        TARFILE=$tarrootdir/`basename $TARFILE`
+
+        if [ ! -r $TARFILE ]; then
+            echo "Archive file not found or no read permissions."
+            exit 1
+        fi
+
+        ;;
+    esac
+
+    shift
+
+done
+
+echo
+
+if [ -z "$MP_PARAM" ]; then
+    echo "**** Missing required parameter: -mp <mp hostname> ****"
+    echo
+    usage
+    exit 1
+fi
+
+if [ -z "$TARFILE" ]; then
+    echo "**** Missing required parameter: <archive file> ****"
+    echo
+    usage
+    exit 1
+fi
+
+if [ -z "$SITECODE_PARAM" ]; then
+    echo "**** Missing required parameter: -sitecode <sitecode> ****"
+    echo
+    usage
+    exit 1
+fi
+
+if [ -n "$DEBUG" ]; then
+    echo "MP: $MP_PARAM"
+    echo "DIR: $INSTALLDIR"
+    echo "NOSTART: $NOSTART"
+    echo "SITE CODE: $SITECODE_PARAM"
+    echo "SIGNING CERT PATH: $SIGN_CERT_PATH"
+    echo "ADDITIONAL ROOT CERTS: $ADDL_ROOT_CERTS"
+fi
+
+if [ -n "$SIGN_CERT_PATH" ]; then
+    if [ ! -r "$SIGN_CERT_PATH" ]; then
+    echo "Error : The Signing Certificate path specified does not exist or it not a valid file path."
+    exit 53
+    fi
+
+    if [ -z "$CRL_LIST" ]; then
+        if [ $NOCRLCHECK -eq 0 ]; then
+            echo "Error : If PKI certificates are used CRLs have to be specified. If not specify -NoCRLCheck override."
+            exit 53
+        fi
+    fi
+
+    if [ -z "$SIGN_CERT_PASSWORD" ]; then
+        # TODO: Trap  so we can reset stty properly afterwards.
+        echo $ECHO_FLAG "Enter Signing Certificate password :\c"
+        stty -echo
+        read SIGN_CERT_PASSWORD
+        stty echo
+        echo ""
+    fi
+fi
+
+if [ -n "$ADDL_ROOT_CERTS" ]; then
+    if [ -z "$SIGN_CERT_PATH" ]; then
+    echo "Error : Root certificates are not appropriate without -UsePKICert qualifier"
+    exit 54
+    fi
+
+    # Validate that the additional root certificate specifications are all valid
+
+    SAVED_IFS="$IFS"
+    IFS=","
+
+    for i in $ADDL_ROOT_CERTS; do
+    if [ ! -r "$i" ]; then
+        echo "Error : -rootcerts file \"$i\" does not exist or it not a valid file path."
+        exit 54
+    fi
+    done
+
+    IFS="$SAVED_IFS"
+fi
+
+if [ -n "$CRL_LIST" ]; then
+    
+    # If CRL was specified the UsePKICert has to be specified
+    if [ -z "$SIGN_CERT_PATH" ]; then
+        echo "Error : CRLs are not appropriate without -UsePKICert qualifier"
+        exit 100
+    fi
+
+    # If CRL was specified then NOCRLCHECK should not be specified
+    if [ $NOCRLCHECK -ne 0 ]; then
+        echo "Error : -NoCRLCheck cannot be specified with CRLs"
+        exit 101
+    fi
+fi
+
+if [ -n "$SITE_SIGN_CERT_PATH" ]; then
+    if [ ! -r "$SITE_SIGN_CERT_PATH" ]; then
+    echo "Error : The Site Server Signing Certificate path specified does not exist or it not a valid file path."
+    exit 55
+    fi
+fi
+
+CMINSTALLDIR=$INSTALLDIR/configmgr
+OMIINSTALLDIR=$INSTALLDIR/omi
+CMBIN=$CMINSTALLDIR/bin
+
+validate_build_architecture
+
+# override TMPBINDIR with the OpenSSL version supported on this system
+TMPBINDIR=bin
+
+# this code was taken from OM's build process.  Logic is slightly reversed: if OPENSSL_SYSTEM_VERSION_098 == 0, then
+# the system OpenSSL version is 0.9.8.  Likewise with OPENSSL_SYSTEM_VERSION_100
+if [ "$PLATFORM" = "Universal" ]; then
+    OPENSSL_SYSTEM_VERSION_FULL=`openssl version | awk '{print $2}'`
+    OPENSSL_SYSTEM_VERSION_098=`echo $OPENSSL_SYSTEM_VERSION_FULL | grep -Eq '^0.9.8'; echo $?`
+    OPENSSL_SYSTEM_VERSION_100=`echo $OPENSSL_SYSTEM_VERSION_FULL | grep -Eq '^1.0.'; echo $?`
+    if [ $OPENSSL_SYSTEM_VERSION_098 = 0 ]; then
+        TMPBINDIR=bin_098
+    elif [ $OPENSSL_SYSTEM_VERSION_100 = 0 ]; then
+        TMPBINDIR=bin_100
+    else
+        echo "Error: This system does not have a supported version of OpenSSL installed."
+        echo "This system's OpenSSL version: $OPENSSL_SYSTEM_VERSION_FULL"
+        echo "Supported versions: 0.9.8*, 1.0.*"
+        exit 60
+    fi
+fi
+
+check_prerequisites
+
+echo "Beginning installation of Config Manager in $CMINSTALLDIR"
+
+
+if [ -d "$CMINSTALLDIR" ]; then
+    
+    if [ ! -w $CMINSTALLDIR ]; then
+        echo "The installation directory: $CMINSTALLDIR is not writable.. exiting."
+        exit 15;
+    fi
+
+    if [ $CLEAN_INSTALL -eq 0 -a $KEEP_DB -eq 0 ]; then
+
+        clear
+        echo "The installation directory already exists..."
+        echo
+        echo "Do you want to: "
+        echo "Install, but keep existing database   [D]"
+        echo "Delete all existing data then install [F]"
+        echo "Exit installer                        [X]"
+        echo
+
+        ANS=
+
+        while [ -z "$ANS" ]; do
+            echo $ECHO_FLAG "Which method do you want? [D]: \c"
+
+            read x
+
+            case "$x" in
+                ""|"D"|"d" )
+                    ANS="D"
+                    KEEP_DB=1
+                ;;
+
+                "F"|"f")
+                    ANS="F"
+                    CLEAN_INSTALL=1
+                ;;
+
+                "X"|"x")
+                    echo
+                    echo "Installation cancelled."
+                    exit 0
+                ;;
+            esac
+        done
+    fi
+
+    if [ -x $CMINSTALLDIR/bin/ccmexec ]; then
+        stop_configmgr
+        echo "done."
+    fi
+
+    # In theory this could be within the above if statement, but
+    # this is safer....
+    if [ -x $OMIINSTALLDIR/bin/omiserver ]; then
+        echo $ECHO_FLAG "Stopping OMI...\c"
+        $OMIINSTALLDIR/bin/omiserver -s > /dev/null
+        echo "done."
+    fi
+
+    # delete the service manager entries for ccmexec
+    case "$OS" in
+        Sol10* )
+            svccfg delete svc:/application/management/ccmexecd:default 2> /dev/null
+            svccfg delete svc:/application/management/omiserver:default 2> /dev/null
+        ;;
+        Sol11* )
+            if [ -f /var/svc/manifest/application/management/ccmexecd.xml -o -f /var/svc/manifest/application/management/omiserver.xml ]; then
+                rm /var/svc/manifest/application/management/ccmexecd.xml 2> /dev/null
+                rm /var/svc/manifest/application/management/omiserver.xml 2> /dev/null
+                svcadm restart svc:/system/manifest-import
+                service_action_delay svc:/system/manifest-import online
+            fi
+        ;;
+        Aix* )
+            rmssys -s ccmexec 2>&1 > /dev/null
+            rmssys -s omiserver 2>&1 > /dev/null
+            
+            # Check if there's an inittab entry
+            grep ccmexec /etc/inittab 2>&1 > /dev/null
+            
+            if [ $? -eq 0 ]; then
+                rmitab ccmexec 2>&1 > /dev/null
+            fi
+
+            grep omiserver /etc/inittab 2>&1 > /dev/null
+            
+            if [ $? -eq 0 ]; then
+                rmitab omiserver 2>&1 > /dev/null
+            fi
+        ;;
+    esac
+
+    if [ $CLEAN_INSTALL -eq 1 ]; then
+        rm -rf $INSTALLDIR/configmgr/* $INSTALLDIR/configmgr/.cache $OMIINSTALLDIR  &> /dev/null
+	if [ "$PLATFORM" = "Universal" ]; then
+            rm -rf $OMIINSTALLDIR"_098" $OMIINSTALLDIR"_100" &> /dev/null
+	fi
+    else 
+        rm -rf $CMINSTALLDIR/bin $CMINSTALLDIR/etc $CMINSTALLDIR/mof $CMINSTALLDIR/providers &> /dev/null
+	
+	# Remove .cache directory, any files in root/ccm/softmgmtagent/, servercookies.xml, and all files under requestedconfig on upgrade
+	rm -rf $CMINSTALLDIR/.cache
+	rm -rf $CMINSTALLDIR/root/ccm/softmgmtagent/*
+	rm -rf $CMINSTALLDIR/root/ccm/policy/servercookies.xml
+	rm -rf $CMINSTALLDIR/root/ccm/policy/machine/requestedconfig/*
+    fi
+
+
+
+    # On occassion, it appears that on AIX, at least, that some fraction of the above
+    # remove occurs asynchronously.  We observed that as the archive file folders were being
+    # deleted during the extract process below.
+    sleep 5
+    
+    if [ $? -ne 0 ]; then
+        echo "Unable to remove existing installtion directory...exiting."
+        exit 12
+    fi
+
+    mkdir -p $CMINSTALLDIR
+
+    if [ $? -ne 0 ]; then
+        echo "Error writing install to directory...exiting."
+        exit 3
+    fi
+else
+    if [ $CLEAN_INSTALL -eq 1 ]; then
+        if [ -x $OMIINSTALLDIR/bin/omiserver ]; then
+            echo $ECHO_FLAG "Stopping OMI...\c"
+            $OMIINSTALLDIR/bin/omiserver -s > /dev/null
+            echo "done."
+        fi
+
+        rm -rf $OMIINSTALLDIR  &> /dev/null
+
+        if [ "$PLATFORM" = "Universal" ]; then
+            rm -rf $OMIINSTALLDIR"_098" $OMIINSTALLDIR"_100" &> /dev/null
+        fi
+    fi
+
+    case "$OS" in
+        Sol10* )
+            svccfg delete svc:/application/management/ccmexecd:default 2> /dev/null
+            svccfg delete svc:/application/management/omiserver:default 2> /dev/null
+        ;;
+        Sol11* )
+            if [ -f /var/svc/manifest/application/management/ccmexecd.xml -o -f /var/svc/manifest/application/management/omiserver.xml ]; then
+                rm /var/svc/manifest/application/management/ccmexecd.xml 2> /dev/null
+                rm /var/svc/manifest/application/management/omiserver.xml 2> /dev/null
+                svcadm restart svc:/system/manifest-import
+                service_action_delay svc:/system/manifest-import online
+            fi
+        ;;
+        Aix* )
+            rmssys -s ccmexec 2>&1 > /dev/null
+            rmssys -s omiserver 2>&1 > /dev/null
+            
+            # Check if there's an inittab entry
+            grep ccmexec /etc/inittab 2>&1 > /dev/null
+            
+            if [ $? -eq 0 ]; then
+                rmitab ccmexec 2>&1 > /dev/null
+            fi
+
+            grep omiserver /etc/inittab 2>&1 > /dev/null
+
+            if [ $? -eq 0 ]; then
+                rmitab omiserver 2>&1 > /dev/null
+            fi
+        ;;
+    esac
+    
+    echo "Creating install directory..."
+    mkdir -p $CMINSTALLDIR
+    if [ $? -ne 0 ]; then
+        echo "Error creating install directory...exiting."
+        exit 3
+    fi
+fi
+
+
+cd $CMINSTALLDIR
+
+echo "Extracting archive file to $CMINSTALLDIR..."
+
+# When doing an update/reinstall There are some circumstances 
+# where the shared library remains loaded for a short time
+# after the process exits, thus causing the re-install to fail.
+while [ -f ./providers/libscxcmprovider.so ]; do
+    sleep 2
+    rm -f ./providers/libscxcmprovider.so 2>&1 > /dev/null
+done
+
+# Does the file end in .Z?
+if [ `echo $TARFILE | grep "\.Z$"` ]; then
+      uncompress -c $TARFILE | tar xf -
+elif [ `echo $TARFILE | grep "\.gz$"` ]; then
+      gunzip -c $TARFILE | tar xf -
+else
+      tar xf $TARFILE
+fi
+
+if [ $? -ne 0 ]; then
+    echo "An unexpected error occured while unpacking $TARFILE."
+    exit 15
+fi
+
+if [ ! -d $CMINSTALLDIR/.cache ]; then
+    mkdir $CMINSTALLDIR/.cache
+    chmod 700 $CMINSTALLDIR/.cache
+fi
+
+# Fix up permissions so we're owned by bin:bin (only necessary for ConfigMgr)
+# Currently cd'd to $CMINSTALLDIR, so just do it relative to where we are
+
+chown -R bin:bin .
+
+if [ $? -ne 0 ]; then
+    echo "An unexpected error updating permissions in $CMINSTALLDIR"
+    exit 15
+fi
+
+ARCHIVE_BASE_NAME=omi
+
+if [ "$PLATFORM" = "Universal" ]; then
+    # delete unnecessary folders
+    # mv bin/* to bin_???/*
+    # rm -rf bin
+    # make link from bin to bin_???
+    # make link from providers to providers_???
+    # remove unsupported SSL version
+    if [ $OPENSSL_SYSTEM_VERSION_098 = 0 ]; then
+        mv bin_098/* bin/
+        rm -rf bin_*/
+
+        ARCHIVE_BASE_NAME=omi_098
+
+        mv ./providers_098 ./providers
+        rm -rf ./providers_*
+
+        mv ./omi_098 ./omi
+        rm -rf ./omi_*
+
+        ln -s $INSTALLDIR/omi_098 $INSTALLDIR/omi
+        OMINSTALLDIR=$INSTALLDIR/omi
+    elif [ $OPENSSL_SYSTEM_VERSION_100 = 0 ]; then
+        mv bin_100/* bin/
+        rm -rf bin_*/
+
+        ARCHIVE_BASE_NAME=omi_100
+
+        mv ./providers_100 ./providers
+        rm -rf ./providers_*
+
+        mv ./omi_100 ./omi
+        rm -rf ./omi_*
+
+        ln -s $INSTALLDIR/omi_100 $INSTALLDIR/omi
+        OMIINSTALLDIR=$INSTALLDIR/omi
+    fi
+fi
+
+cd omi
+echo "Installing OMI"
+
+# Backup omi keys and provider conf file
+KEYFILEPATH=$OMIINSTALLDIR/etc/ssl/certs/omikey.pem
+CERTFILEPATH=$OMIINSTALLDIR/etc/ssl/certs/omi.pem
+PROVIDERCONFFILEPATH=$OMIINSTALLDIR/etc/scxcmprovider.conf
+
+if [ -f "$KEYFILEPATH" -a -f "$CERTFILEPATH" ]; then
+    mv $KEYFILEPATH ./omikey.pem
+    mv $CERTFILEPATH ./omi.pem
+fi
+if [ -f "$PROVIDERCONFFILEPATH" ]; then
+    mv $PROVIDERCONFFILEPATH ./scxcmprovider.conf
+fi
+
+rm -rf $OMIINSTALLDIR
+
+mkdir -p $OMIINSTALLDIR/etc/ssl/certs
+if [ -f "./omikey.pem" -a -f "./omi.pem" ]; then
+    mv ./omikey.pem $KEYFILEPATH
+    mv ./omi.pem $CERTFILEPATH
+fi
+if [ -f "./scxcmprovider.conf" ]; then
+    mv ./scxcmprovider.conf $PROVIDERCONFFILEPATH
+fi
+
+./install --destdir=$OMIINSTALLDIR
+
+if [ $? -ne 0 ]; then
+    echo "An error occured while installing OMI."
+    exit 5
+fi
+
+if [ "$PLATFORM" = "Universal" ]; then
+    CreateOpenSSLLinksIfNecessary $OMIINSTALLDIR/lib
+fi
+
+# Set CM_HOME in OMI startup Script.
+cd $OMIINSTALLDIR/bin
+chmod 755 omiserver
+echo "Setting CM_HOME in omiserver..."
+sed -e "s@^#export@export@;s@<CM_HOME>@$CMINSTALLDIR@;s@^#CM_HOME@CM_HOME@" omiserver > omiserver.tmp
+mv omiserver.tmp omiserver
+sed -e "s@^#export@export@;s@<OMI_HOME>@$OMIINSTALLDIR@;s@^#OMI_HOME@OMI_HOME@" omiserver > omiserver.tmp
+mv omiserver.tmp omiserver
+
+# On some AIX systems, LD_LIBRARY_PATH isn't used. Use LIBPATH instead.
+if [ "`uname -s`" = "AIX" ]; then
+    sed -e "s@LD_LIBRARY_PATH@LIBPATH@g" omiserver > omiserver.tmp
+    mv omiserver.tmp omiserver
+fi
+
+chmod 755 omiserver
+
+# Disable the http/https ports..
+cd $OMIINSTALLDIR/etc
+chmod 644 omiserver.conf
+echo "Disabling HTTP Ports..."
+sed -e 's/#httpport=PORT/httpport=0/;s/#httpsport=PORT/httpsport=0/' omiserver.conf > omiserver.conf.tmp
+mv omiserver.conf.tmp omiserver.conf
+
+# Make sure configuration file is writable
+echo "Modifying install scripts for OMI"
+sed -e "s@<OMI_HOME>@$OMIINSTALLDIR@" $OMIINSTALLDIR/etc/scxcmprovider.conf > $OMIINSTALLDIR/etc/scxcmprovider.conf.tmp
+mv $OMIINSTALLDIR/etc/scxcmprovider.conf.tmp $OMIINSTALLDIR/etc/scxcmprovider.conf
+chmod 644 $OMIINSTALLDIR/etc/scxcmprovider.conf
+
+cd $CMINSTALLDIR
+
+echo "Registering Providers..."
+for prov in `ls $CMINSTALLDIR/providers` 
+do
+    LD_LIBRARY_PATH=$OMIINSTALLDIR/lib ; export LD_LIBRARY_PATH ; $OMIINSTALLDIR/bin/omireg -n root/cimv2 -l -o root $CMINSTALLDIR/providers/$prov
+    if [ $? -ne 0 ]; then
+        echo "An error occured while registering providers."
+        exit 6
+    fi
+done
+
+echo "Performing post installation cleanup..."
+rm -rf $CMINSTALLDIR/omi*
+
+# Make sure script is writable.
+chmod 755 $CMBIN/start
+
+# Fixup environment variables in startup script.
+case `uname -s` in
+    AIX )
+        sed -e "s@LD_LIBRARY_PATH@LIBPATH@g;s@<MP_HOSTNAME>@$MP_PARAM@;s@<SITECODE>@$SITECODE_PARAM@;s@<INSTALLHOME>@$CMINSTALLDIR@;s@<HTTPS_CAPABLE>@$HTTPS_CAPABLE@" $CMBIN/start > $CMBIN/start.tmp
+    ;;
+
+    HP-UX )
+        sed -e "s@LD_LIBRARY_PATH@SHLIB_PATH@g;s@<MP_HOSTNAME>@$MP_PARAM@;s@<SITECODE>@$SITECODE_PARAM@;s@<INSTALLHOME>@$CMINSTALLDIR@;s@<HTTPS_CAPABLE>@$HTTPS_CAPABLE@" $CMBIN/start > $CMBIN/start.tmp
+    ;;
+
+    *)
+        sed -e "s@<MP_HOSTNAME>@$MP_PARAM@;s@<SITECODE>@$SITECODE_PARAM@;s@<INSTALLHOME>@$CMINSTALLDIR@;s@<HTTPS_CAPABLE>@$HTTPS_CAPABLE@" $CMBIN/start > $CMBIN/start.tmp
+    ;;
+esac
+
+mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+
+if [ -n "$FSP_PARAM" ]; then
+    sed -e "s@^#CM_FSP@CM_FSP@;s@<FSP_HOSTNAME>@$FSP_PARAM@" $CMBIN/start > $CMBIN/start.tmp
+    mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+fi
+
+if [ -n "$HTTP_PORT_PARAM" ]; then
+    sed -e "s@^#HTTP_PORT@HTTP_PORT@;s@<HTTP_PORT>@$HTTP_PORT_PARAM@" $CMBIN/start > $CMBIN/start.tmp
+    mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+fi
+
+if [ -n "$HTTPS_PORT_PARAM" ]; then
+    sed -e "s@^#HTTPS_PORT@HTTPS_PORT@;s@<HTTPS_PORT>@$HTTPS_PORT_PARAM@;" $CMBIN/start > $CMBIN/start.tmp
+    mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+fi
+
+if [ -n "$IGNORE_SHA256_VALIDATION_PARAM" ]; then
+    sed -e "s@^#IGNORE_SHA256_VALIDATION@IGNORE_SHA256_VALIDATION@;s@<IGNORE_SHA256_VALIDATION>@$IGNORE_SHA256_VALIDATION_PARAM@;" $CMBIN/start > $CMBIN/start.tmp
+    mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+fi
+
+if [ -n "$NOCRLCHECK" ]; then
+    sed -e "s@^#IGNORE_CRL_CHECK@IGNORE_CRL_CHECK@;s@<IGNORE_CRL_CHECK>@$NOCRLCHECK@;" $CMBIN/start > $CMBIN/start.tmp
+    mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+fi
+
+if [ -n "$TH_MAXRETRIES" ]; then
+    sed -e "s@^#TH_MAXRETRIES@TH_MAXRETRIES@;s@<MAXRETRIES>@$TH_MAXRETRIES@;" $CMBIN/start > $CMBIN/start.tmp
+    mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+fi
+
+if [ -n "$TH_RETRYINTERVAL" ]; then
+    sed -e "s@^#TH_RETRYINTERVAL@TH_RETRYINTERVAL@;s@<RETRYINTERVAL>@$TH_RETRYINTERVAL@;" $CMBIN/start > $CMBIN/start.tmp
+    mv $CMINSTALLDIR/bin/start.tmp $CMINSTALLDIR/bin/start
+fi
+
+# Make sure statup script is executable.
+chmod 755 $CMBIN/start
+
+# Fixup uninstall script.
+sed -e "s@<INSTALLHOME>@$CMINSTALLDIR@;s@<LOGGINGDIR>@$LOGGINGDIR@" $CMBIN/uninstall > $CMBIN/uninstall.tmp
+mv $CMBIN/uninstall.tmp $CMBIN/uninstall
+chmod 755 $CMBIN/uninstall
+
+# Fixup restart script.
+sed -e "s@<INSTALLHOME>@$CMINSTALLDIR@" $CMBIN/restart > $CMBIN/restart.tmp
+mv $CMBIN/restart.tmp $CMBIN/restart
+chmod 755 $CMBIN/restart
+rm -f /opt/microsoft/cm/bin/restart
+mkdir -p /opt/microsoft/cm/bin
+ln -s $CMBIN/restart /opt/microsoft/cm/bin/restart
+chmod 755 /opt/microsoft/cm/bin/restart
+
+# Make sure configuration file is writable
+sed -e "s@<CM_HOME>@$LOGGINGDIR@" $CMINSTALLDIR/etc/scxcm.conf > $CMINSTALLDIR/etc/scxcm.conf.tmp 
+mv $CMINSTALLDIR/etc/scxcm.conf.tmp $CMINSTALLDIR/etc/scxcm.conf
+chmod 644 $CMINSTALLDIR/etc/scxcm.conf
+
+if [ ! -d "$LOGGINGDIR" ]; then
+    mkdir -p $LOGGINGDIR
+    if [ $? -ne 0 ]; then 
+        echo "An error occured while creating the log directory: $LOGGINGDIR"
+        exit 1
+    fi
+fi
+
+# Rename the binaries for consistency.
+mv $CMBIN/CCMExec $CMBIN/ccmexec.bin
+mv $CMBIN/importmoffile $CMBIN/importmoffile.bin
+mv $CMBIN/importrootkey $CMBIN/importrootkey.bin
+mv $CMBIN/certutil $CMBIN/certutil.bin
+
+# Link the startup script
+echo "Linking startup script..."
+ln -s $CMBIN/start $CMBIN/ccmexec
+ln -s $CMBIN/start $CMBIN/importmoffile
+ln -s $CMBIN/start $CMBIN/importrootkey
+ln -s $CMBIN/start $CMBIN/dscli
+ln -s $CMBIN/start $CMBIN/certutil
+
+if [ $KEEP_DB -eq 0 -o ! -d "$CMINSTALLDIR/root/microsoft" ]; then
+    # Importing MOF files...
+    echo "Initializing data store.  This may take a few minutes..."
+    $CMBIN/importmoffile 2>&1 > /dev/null
+fi
+
+if [ -n "$SIGN_CERT_PATH" ]; then
+
+    if [ -n "$CRL_LIST" ]; then
+        # Import CRL first
+        echo "Importing CRLs"
+        $CMBIN/certutil -ImportCRL $CRL_LIST
+        if [ $? -ne 0 ]; then
+            echo "Failed to import the Certificate revocation list."
+            cleanup_failed_install
+            exit 102
+        fi
+    fi
+
+    # Import the Signing Certificate
+    echo "Importing the Client Signing certificate..."
+    ROOT_CERT_SPEC=""
+    if [ -n "$ADDL_ROOT_CERTS" ] ; then
+    ROOT_CERT_SPEC="-rootcerts $ADDL_ROOT_CERTS"
+    fi
+    $CMBIN/certutil -importPFX $SIGN_CERT_PATH -password $SIGN_CERT_PASSWORD $ROOT_CERT_SPEC
+
+    if [ $? -ne 0 ]; then
+        echo "Failed to import the Client Signing certificate."
+        cleanup_failed_install
+        exit 55
+    fi
+fi
+
+if [ -n "$SITE_SIGN_CERT_PATH" ]; then
+    # Import the Site server Signing Certificate
+
+    $CMBIN/certutil -importsitecert $SITE_SIGN_CERT_PATH
+
+    if [ $? -ne 0 ]; then
+        echo "Failed to import the Site Server Signing certificate."
+        cleanup_failed_install
+        exit 59
+    fi
+fi
+
+if [ -n "$ROOT_KEY_PATH" ]; then
+    # Does file exist...
+    if [ ! -f "$ROOT_KEY_PATH" ]; then
+        echo "Unable to locate rootkey file at specified location: $ROOT_KEY_PATH" 
+        cleanup_failed_install
+        exit 56
+    fi
+    # Is file readable.
+    if [ ! -r "$ROOT_KEY_PATH" ]; then
+        echo "No read access to rootkey file at specified location: $ROOT_KEY_PATH" 
+        cleanup_failed_install
+        exit 57
+    fi
+    # Import Trusted Root Key...
+    echo "Importing Trusted Root Key..."
+    $CMBIN/importrootkey $ROOT_KEY_PATH
+    if [ $? -ne 0 ]; then
+        echo "Syntax error reading rootkey file at specified location: $ROOT_KEY_PATH"
+        cleanup_failed_install
+        exit 58
+    fi
+fi
+
+echo "Installing boot-time scripts..."
+
+configure_boot_startup
+configure_reset_scripts
+
+if [ "$NOSTART" -ne 1 ]; then
+    echo "Starting Configuration Manager..."
+    start_configmgr
+fi
+
+echo "Installation complete."

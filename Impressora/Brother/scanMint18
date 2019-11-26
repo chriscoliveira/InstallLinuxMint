@@ -1,0 +1,34 @@
+Problemas de scanner no Linux Mint 18 Sarah 64bits:
+
+Editar o arquivo abaixo:
+
+-------------------------------------------------------------------------------------
+sudo gedit /lib/udev/rules.d/40-libsane.rules
+Após a linha LABEL="libsane_rules_end", entre com as 2 linhas abaixo:
+# Brother scanners
+ATTRS{idVendor}=="04f9", ENV{libsane_matched}="yes"
+
+ou
+
+sudo gedit /lib/udev/rules.d/40-libsane.rules
+# Brother scanners
+ATTRS{idVendor}=="04f9", MODE="0664", GROUP="scanner", ENV{libsane_matched}="yes"
+-------------------------------------------------------------------------------------
+
+Digite o comando scanimage -L e deverá retornar a msg de erro abaixo:
+
+No scanners were identified. If you were expecting something different,
+check that the scanner is plugged in, turned on and detected by the
+sane-find-scanner tool (if appropriate). Please read the documentation
+which came with this software (README, FAQ, manpages).
+
+Para corrigir, executar os comandos abaixo:
+sudo cp -a /usr/lib64/sane/libsane-brother* /usr/lib/x86_64-linux-gnu/sane/
+
+Depois execute o comando scanimage -L e retonará a msg abaixo:
+device `brotherX:net1;dev0' is a Brother model namescanner
+
+onde:
+brotherX refere-se a versão do brsxcan instalada (1,2,3 ou 4)
+model: modelo da impressora (ex: DCP-8085DN)
+namescanner: nome dado ao scanner (ex: ScannerDP)

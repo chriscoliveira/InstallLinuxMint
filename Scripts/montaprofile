@@ -1,0 +1,37 @@
+#!/bin/bash
+
+SENHA=$(echo $1 | base64 --decode)
+
+
+sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $2 $HOME/Área\ de\ Trabalho
+sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $3 $HOME/Documentos
+sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $4 $HOME/Público
+sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $5 $HOME/WallPaper
+
+if [ $6 != " " ]; then
+	loc=$6
+	valor=${loc/;/" "}
+	sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $valor 
+fi
+if [ $7 != " " ]; then
+	loc=$7
+        valor=${loc/;/" "}
+        sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $valor
+fi
+if [ $8 != " " ]; then
+	loc=$8
+        valor=${loc/;/" "}
+        sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $valor
+fi
+if [ $9 != " " ]; then
+	loc=$9
+        valor=${loc/;/" "}
+        sudo mount -t cifs -s -o username=$USER,password=$SENHA,rw,users,dir_mode=0777,file_mode=0777 $valor
+fi
+
+
+
+gsettings set org.cinnamon.desktop.background picture-uri file:///$HOME/WallPaper/800x600.jpg
+gsettings set org.cinnamon.desktop.background picture-options 'stretched'
+
+

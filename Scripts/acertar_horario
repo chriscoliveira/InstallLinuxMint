@@ -1,0 +1,9 @@
+echo "Data/hora atual"
+date
+echo "Digite o IP do servidor"
+read ip
+sudo service ntp stop
+sudo ntpdate $ip
+sudo hwclock --systohc
+echo "Data/hora correta"
+date

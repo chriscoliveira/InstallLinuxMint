@@ -1,0 +1,11 @@
+echo "Digite o numero da loja, Ex.: 18, 08"
+read CT
+echo "entrando no dominio"
+sudo net ads join -U usradm$CT
+echo "Reiniciando os Serviços"
+sudo service winbind restart
+sudo service samba restart
+echo "Exibindo os grupos do AD para teste"
+sudo wbinfo -g
+
+

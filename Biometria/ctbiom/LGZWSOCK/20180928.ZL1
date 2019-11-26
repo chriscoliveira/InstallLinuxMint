@@ -1,0 +1,147 @@
+~$|LGZWSOCK|66|0|13|0|102400|26|12|10|
+28/09/2018 08:41:462922 LGZWSOCK criado(lnx)[up=286s]GMT:28/9/2018 11:41:46(1538134906)S9IBfk.
+
+8fk 2922 LGZWSOCK aberto(lnx)[up=286s]GMT:28/9/2018 11:41:46(1538134906)S9IBfk.
+8fk 2922 [ZSRVHTTP]Conexao(p=36622,fd=5).
+8fk 2922 [ZSRVHTTP] 1:"POST  /biometria/".
+8fk 2922 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8fk 2922 [ZSRVHTTP] 3:"Content-Length: 29".
+8fk 2922 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8fk 2922 [ZSRVHTTP] 5:"Connection: keep-alive".
+8fk 2922 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+8fk 2922 [ZSRVHTTP]12:"\r\n".
+8fq 2922 [ZSRVHTTP][BIOMETRIAHTTP]Servindo 1366b.
+8fq 2922 [ZSRVHTTP]Descartando sessao xB6C00C80.
+8gM 2922 [ZSRVHTTP]Conexao(p=36624,fd=5).
+8gM 2922 [ZSRVHTTP] 1:"POST  /biometria/".
+8gM 2922 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8gM 2922 [ZSRVHTTP] 3:"Content-Length: 29".
+8gM 2922 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8gM 2922 [ZSRVHTTP] 5:"Connection: keep-alive".
+8gM 2922 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+8gM 2922 [ZSRVHTTP]12:"\r\n".
+
+8iW 2991 LGZWSOCK aberto(lnx)[up=452s]GMT:28/9/2018 11:44:32(1538135072)S9IBiW.
+8iW 2991 [ZSRVHTTP]Conexao(p=36658,fd=5).
+8iW 2991 [ZSRVHTTP] 1:"POST  /biometria/".
+8iW 2991 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8iW 2991 [ZSRVHTTP] 3:"Content-Length: 29".
+8iW 2991 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8iW 2991 [ZSRVHTTP] 5:"Connection: keep-alive".
+8iW 2991 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+8iW 2991 [ZSRVHTTP]12:"\r\n".
+8jL 2991 [ZSRVHTTP][BIOMETRIAHTTP]Servindo 1366b.
+8jL 2991 [ZSRVHTTP]Conexao(p=36684,fd=6).
+8jL 2991 [ZSRVHTTP]Conexao(p=36686,fd=7).
+8jL 2991 [ZSRVHTTP]Descartando sessao xB6C00C80.
+8jL 2991 [ZSRVHTTP] 1:"POST  /biometria/".
+8jL 2991 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8jL 2991 [ZSRVHTTP] 3:"Content-Length: 29".
+8jL 2991 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8jL 2991 [ZSRVHTTP] 5:"Connection: keep-alive".
+8jL 2991 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+8jM 2991 [ZSRVHTTP]12:"\r\n".
+
+8kd 3030 LGZWSOCK aberto(lnx)[up=579s]GMT:28/9/2018 11:46:39(1538135199)S9IBkd.
+8kd 3030 [ZSRVHTTP]Conexao(p=36722,fd=5).
+8kd 3030 [ZSRVHTTP] 1:"POST  /biometria/".
+8kd 3030 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8kd 3030 [ZSRVHTTP] 3:"Content-Length: 29".
+8kd 3030 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8kd 3030 [ZSRVHTTP] 5:"Connection: keep-alive".
+8kd 3030 [ZSRVHTTP]10:"Origin: http://10.128.0.19".
+8kd 3030 [ZSRVHTTP]12:"\r\n".
+
+8mm 3439 LGZWSOCK aberto(lnx)[up=709s]GMT:28/9/2018 11:48:48(1538135328)S9IBmm.
+8mm 3439 [ZSRVHTTP]Conexao(p=36918,fd=5).
+8mm 3439 [ZSRVHTTP] 1:"POST  /biometria/".
+8mm 3439 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8mm 3439 [ZSRVHTTP] 3:"Content-Length: 29".
+8mm 3439 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8mn 3439 [ZSRVHTTP] 5:"Connection: keep-alive".
+8mn 3439 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+8mn 3439 [ZSRVHTTP]12:"\r\n".
+
+8pN 3654 LGZWSOCK aberto(lnx)[up=863s]GMT:28/9/2018 11:51:23(1538135483)S9IBpN.
+8pN 3654 [ZSRVHTTP]Conexao(p=37004,fd=5).
+8pN 3654 [ZSRVHTTP] 1:"POST  /biometria/".
+8pN 3654 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8pN 3654 [ZSRVHTTP] 3:"Content-Length: 29".
+8pN 3654 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8pN 3654 [ZSRVHTTP] 5:"Connection: keep-alive".
+8pN 3654 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+8pN 3654 [ZSRVHTTP]12:"\r\n".
+
+8v3 2432 LGZWSOCK aberto(lnx)[up=123s]GMT:28/9/2018 11:57:03(1538135823)S9IBv3.
+8v3 2432 [ZSRVHTTP]Conexao(p=48090,fd=5).
+8v3 2432 [ZSRVHTTP] 1:"POST  /biometria/".
+8v3 2432 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+8v3 2432 [ZSRVHTTP] 3:"Content-Length: 29".
+8v3 2432 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+8v3 2432 [ZSRVHTTP] 5:"Connection: keep-alive".
+8v3 2432 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+8v3 2432 [ZSRVHTTP]12:"\r\n".
+
+919 2597 LGZWSOCK aberto(lnx)[up=134s]GMT:28/9/2018 12:01:09(1538136069)S9IC19.
+919 2597 [ZSRVHTTP]Conexao(p=53464,fd=5).
+919 2597 [ZSRVHTTP] 1:"POST  /biometria/".
+919 2597 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+919 2597 [ZSRVHTTP] 3:"Content-Length: 29".
+919 2597 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+919 2597 [ZSRVHTTP] 5:"Connection: keep-alive".
+91A 2597 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+91A 2597 [ZSRVHTTP]12:"\r\n".
+
+97Z 2463 LGZWSOCK aberto(lnx)[up=114s]GMT:28/9/2018 12:07:35(1538136455)S9IC7Z.
+97Z 2463 [ZSRVHTTP]Conexao(p=33604,fd=5).
+97Z 2463 [ZSRVHTTP] 1:"POST  /biometria/".
+97Z 2463 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+97Z 2463 [ZSRVHTTP] 3:"Content-Length: 29".
+97a 2463 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+97a 2463 [ZSRVHTTP] 5:"Connection: keep-alive".
+97a 2463 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+97a 2463 [ZSRVHTTP]12:"\r\n".
+
+9PV 2672 LGZWSOCK aberto(lnx)[up=1190s]GMT:28/9/2018 12:25:31(1538137531)S9ICPV.
+9PV 2672 [ZSRVHTTP]Conexao(p=33708,fd=5).
+9PV 2672 [ZSRVHTTP] 1:"POST  /biometria/".
+9PV 2672 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+9PV 2672 [ZSRVHTTP] 3:"Content-Length: 29".
+9PW 2672 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+9PW 2672 [ZSRVHTTP] 5:"Connection: keep-alive".
+9PW 2672 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+9PW 2672 [ZSRVHTTP]12:"\r\n".
+
+9s7 2954 LGZWSOCK aberto(lnx)[up=661s]GMT:28/9/2018 12:54:07(1538139247)S9ICs7.
+9s7 2954 [ZSRVHTTP]Conexao(p=49852,fd=5).
+9s7 2954 [ZSRVHTTP] 1:"POST  /biometria/".
+9s7 2954 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+9s7 2954 [ZSRVHTTP] 3:"Content-Length: 29".
+9s7 2954 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+9s8 2954 [ZSRVHTTP] 5:"Connection: keep-alive".
+9s8 2954 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+9s8 2954 [ZSRVHTTP]12:"\r\n".
+
+AKX 2434 LGZWSOCK aberto(lnx)[up=139s]GMT:28/9/2018 13:20:33(1538140833)S9IDKX.
+AKX 2434 [ZSRVHTTP]Conexao(p=58506,fd=5).
+AKX 2434 [ZSRVHTTP] 1:"POST  /biometria/".
+AKX 2434 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+AKX 2434 [ZSRVHTTP] 3:"Content-Length: 29".
+AKX 2434 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+AKX 2434 [ZSRVHTTP] 5:"Connection: keep-alive".
+AKX 2434 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+AKX 2434 [ZSRVHTTP]12:"\r\n".
+AN6 2434 [ZSRVHTTP][BIOMETRIAHTTP]Servindo 1367b.
+AN6 2434 [ZSRVHTTP]ERROR writing to socket
+AN6 2434 [ZSRVHTTP][BIOMETRIAHTTP]http_serve_string() falhou.
+AN6 2434 [ZSRVHTTP]Conexao(p=58596,fd=6).
+AN6 2434 [ZSRVHTTP]Descartando sessao xB6C00C80.
+AN7 2434 [ZSRVHTTP] 1:"POST  /biometria/".
+AN7 2434 [ZSRVHTTP] 2:"CORPO PARAM={"cmd":0,"timeout":500}".
+AN7 2434 [ZSRVHTTP] 3:"Content-Length: 29".
+AN7 2434 [ZSRVHTTP] 4:"Host: 127.0.0.1:8877".
+AN7 2434 [ZSRVHTTP] 5:"Connection: keep-alive".
+AN7 2434 [ZSRVHTTP]10:"Origin: http://10.128.0.21".
+AN7 2434 [ZSRVHTTP]12:"\r\n".
+ANB 2434 [ZSRVHTTP][BIOMETRIAHTTP]Servindo 1365b.
+ANB 2434 [ZSRVHTTP]Descartando sessao xB6C0EDC8.

@@ -1,0 +1,42 @@
+#!/bin/bash
+
+RKGRAY='\033[1;30m'
+eRED='\033[0;31;160m'
+RED='\033[37;41m'
+LIGHTRED='\033[1;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+LIGHTPURPLE='\033[1;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+SET='\033[0m'
+
+date
+echo "${RED}\n\n\n Personalizando o sistema \n\n ${SET}"
+
+sudo cp -Rv /Instalacao/Temas/Cinnamon/Applets/localip@mrieracrespi /usr/share/cinnamon/applets
+cp -Rv /Instalacao/Temas/Cinnamon/Applets/localipswithsettings@edaubert $HOME/.local/share/cinnamon/applets
+
+cp -vr /Instalacao/Temas/localipsM19/.cinnamon/configs/* $HOME/.cinnamon/configs/
+cp -vr /Instalacao/Temas/localipsM19/.cinnamon/spices.cache/applet/* $HOME/.cinnamon/spices.cache/applet/
+cp -vr /Instalacao/Temas/localipsM19/.local/share/cinnamon/applets/* $HOME/.local/share/cinnamon/applets/
+
+sudo chmod -R 777 $HOME/.local/share/cinnamon/applets/*
+sudo chmod -R 777 $HOME/.local/share/locale/*
+sudo chmod -R 777 $HOME/.local/share/cinnamon/applets/localipswithsettings@edaubert
+sudo chmod -R 777 /usr/share/cinnamon/applets/
+
+dconf load /org/cinnamon/ < /Instalacao/backup_cinnamon
+sudo cp -v /Instalacao/lightdm.conf /etc/lightdm/
+
+echo "Colocar os icones no painel"
+cat icones > $HOME/.cinnamon/configs/panel-launchers@cinnamon.org/3.json
+mkdir -p $HOME/.local/share/applications
+cp -v Java/Sitef.desktop $HOME/.local/share/applications
+
+
+#cinnamon-settings
+echo "Abrindo mdmSetup para ajuste na tela de login."
+sudo mdmsetup

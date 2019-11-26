@@ -1,0 +1,37 @@
+{
+    "refreshInterval": {
+        "type": "spinbutton",
+        "default": 60,
+        "min": 30,
+        "max": 3600,
+        "units": "seconds",
+        "step": 5,
+        "description": "Update interval",
+        "value": 60
+    },
+    "IPv4": {
+        "type": "checkbox",
+        "default": true,
+        "description": "Display IPv4 information",
+        "value": true
+    },
+    "IPv6": {
+        "type": "checkbox",
+        "default": true,
+        "description": "Display IPv6 information",
+        "value": false
+    },
+    "inet": {
+        "type": "entry",
+        "default": "eth0,eth1,eth2,wlan0,enp2s0,enp1s0",
+        "description": "List all interfaces we want to display.\nSeparated by comma.\nRegex is accepted (usefull to list all docker interfaces for example)",
+        "value": "eth0,eth1,eth2,wlan0,enp2s0,enp1s0"
+    },
+    "debug": {
+        "type": "checkbox",
+        "default": false,
+        "description": "Activate/Deactivate the logs",
+        "value": false
+    },
+    "__md5__": "176acc535cd2a060165fdcf803e49ea8"
+}

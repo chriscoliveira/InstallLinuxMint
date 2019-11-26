@@ -1,0 +1,15 @@
+sudo chmod 777 -R /Instalacao/SystemCenterLinux/*
+cd /Instalacao/SystemCenterLinux
+
+case $(uname -m) in
+x86_64)
+	sudo ./install -mp TNDAPPSCM.tenda.com.br -sitecode SCT ccm-Universalx64.tar
+    ;;
+i*86)
+	sudo ./install -mp TNDAPPSCM.tenda.com.br -sitecode SCT ccm-Universalx86.tar
+    ;;
+*)
+    BITS=?
+    ;;
+esac
+

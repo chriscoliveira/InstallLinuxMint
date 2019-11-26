@@ -1,0 +1,23 @@
+#!/bin/bash
+
+RKGRAY='\033[1;30m'
+eRED='\033[0;31;160m'
+RED='\033[37;41m'
+LIGHTRED='\033[1;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+LIGHTPURPLE='\033[1;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+SET='\033[0m'
+
+date
+echo "${RED}\n\n\n Removendo impressora Brother \n\n${SET}"
+dpkg -l | grep Brother
+sleep 3
+sudo dpkg -P brscan-skey brscan* brscan2 brscan3 cupswrapperdcp8065dn cupswrapperdcp8080dn cupswrapperdcp8* dcp8080dnlpr dcp* brdcp8065dnlpr brdcp*
+echo "Verifique se a lista abaixo esta vazia"
+dpkg -l | grep Brother
+sleep 3

@@ -1,0 +1,12 @@
+sudo killall -9 MGV5.exe
+sudo killall -9 SetRede.exe
+sudo killall -9 BCK.EXE
+sudo killall -9 MGVMONIT.EXE
+sudo killall -9 CONTROLE.EXE
+
+sudo killall -9 oosplash
+sudo killall -9 soffice.bin
+sudo killall -9 wineserver
+sudo killall -9 java
+sudo killall -9 wps
+

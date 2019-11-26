@@ -1,0 +1,9 @@
+[Desktop Entry]
+Comment=Sitef Web
+Terminal=false
+Name=Sitef
+Exec=javaws /Instalacao/Java/sitefwebjws_novo.jnlp
+Type=Application
+Name[pt_BR]=SitefWeb
+Categories=Network
+Icon=/usr/share/icons/Win10/256x256/apps/java.png

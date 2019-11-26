@@ -1,0 +1,74 @@
+Passo 1
+
+Copiar o conteudo da pasta ld.so.conf.d para a pasta /etc/ld.so.conf.d (sudo cp -vr * /etc/ld.so.conf.d)
+
+dentro da pasta /etc/ld.so.conf.d executar o ldconfig (sudo ldconfig)
+
+Criar a pasta Zanthus/Zeus na raiz (sudo mkdir -p /Zanthus/Zeus/) e depois executar (sudo chmod 777 -R /Zanthus/Zeus)
+
+Copiar para dentro do Zanthus/Zeus as pastas lib lib_co5 lib_ubu e ctbiom (sudo cp -vr lib lib_co5 lib_ubu ctbiom /Zanthus/Zeus)
+
+Dentro de cada pasta "lib", executar o comando (sudo ldconfig)
+
+Dar permissao de execucao no arquivo lnx_ctbiom.xz dentro da pasta ctbiom (sudo chmod 777 lnx_ctbiom.xz)
+
+----------------------------------------------------------------------------
+
+Passo 2
+
+Dentro de /Zanthus/Zeus/ctbiom, criar o arquivo Biometria.sh (sudo touch Biometria.sh) e inserir o conteudo abaixo dentro dele:
+
+#!/bin/bash
+
+cd /Zanthus/Zeus/ctbiom/ && sudo ./lnx_ctbiom.xz 
+
+Salva o arquivo e de as permissao de execucao para o mesmo (sudo chmod u+x Biometria.sh)
+----------------------------------------------------------------------------
+
+Passo 3
+
+Executar os comandos abaixo na ordem:
+sudo dpkg --print-architecture (verifica arch principal)
+sudo dpkg --print-foreign-architecture (verifica a arch estrangeira)
+sudo dpkg --add-architecture i386 (adiciona a arch 32bits no LM 64bits)
+sudo apt-get update
+sudo apt install ia32-libs libc6:i386 libncurses5:i386 libstdc++6:i386 multiarch-support gcc-multilib lib32z1 libgtk2.0-0:i386 libglu1-mesa:i386 libxmu6:i386 libidn11:i386 libusb-0.1-4:i386
+
+----------------------------------------------------------------------------
+
+Passo 4
+
+Edite o sudoers (/etc/sudoers) MUITO CUIDADO COM A EDICAO DESTE ARQUIVO!!! QUALQUER ERRO, DEIXARA O SO INABILITADO!!!!!!
+
+Após a palavra "NOPASSWORD" de cada usuario, inserir a linha abaixo ao final da linha (voce devera colocar a virgula "," antes de colar ou escrever a linha abaixo):
+/Zanthus/Zeus/ctbiom/Biometria.sh,/Zanthus/Zeus/ctbiom/lnx_ctbiom.xz
+
+Exemplo de como ficara a edicao: adming   ALL=(ALL) ALL, NOPASSWD: /bin/mount,/sbin/shutdown,/sbin/poweroff,/sbin/reboot,/bin/bash,/bin/sh,/Zanthus/Zeus/ctbiom/Biometria.sh,/Zanthus/Zeus/ctbiom/lnx_ctbiom.xz
+
+-------------------------------------------------------------------
+
+Passo 5
+
+No terminal, digite (sudo touch /etc/xdg/autostart/biometriacxc.desktop);
+Abra o arquivo e cole o conteudo abaixo:
+sudo echo "[Desktop Entry]
+Name=Inicia Biometria
+Comment=Inicia serviço da biometria
+Keywords=biometria
+NoDisplay=true
+Exec=sudo /Zanthus/Zeus/ctbiom/./lnx_ctbiom.xz
+OnlyShowIn=GNOME;LXDE;Unity;MATE;XFCE;
+Terminal=false
+Type=Application
+X-GNOME-Autostart-Phase=Applications
+X-GNOME-AutoRestart=true
+X-GNOME-UsesNotifications=true
+X-Ubuntu-Gettext-Domain=biometria" > /etc/xdg/autostart/biometriacxc.desktop
+
+Salva o arquivo e reinicia a estação e logue novamente. Abra o terminal e digite: (ps aux | grep lnx_*) e veja se o serviço lnx_ctbiom.xz esta rodando. Devera aparecer mensagem assim: sudo /Zanthus/Zeus/ctbiom/./lnx_ctbiom.xz ou /Zanthus/Zeus/ctbiom/./lnx_ctbiom.xz ou sudo ./lnx_ctbiom.xz ou ./lnx_ctbiom.xz ou pode aparecer todas juntas.
+
+-------------------------------------------------------------------
+
+
+Depois de fazer todo os passos acima basta testar a biometria tentando fazer o cadastro no manager.
+-------------------------------------------------------------------

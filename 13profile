@@ -1,0 +1,49 @@
+#!/bin/bash
+
+RKGRAY='\033[1;30m'
+eRED='\033[0;31;160m'
+RED='\033[37;41m'
+LIGHTRED='\033[1;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+LIGHTPURPLE='\033[1;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+SET='\033[0m'
+
+date
+
+
+#CTLOJA = CT18
+#grp_SETOR = grp_cpd
+#
+
+echo "Digite o número da loja. Ex: 08, 18, 43..."
+read CTLOJA
+echo "Digite o Setor. Ex: CPD, ADM, CXC..."
+read grp_SETOR
+echo "Os arquivos do Usuário estão hospedados na planus? 1-Sim 2-Não"
+read planus
+#1-sim 2-nao
+
+
+cp -v /Instalacao/profile /Instalacao/profile.mod
+
+if [ $planus = "1" ] 
+then
+	sed -i "s,10.NUMLOJA.1.9,195.1.1.9/CTLOJA,g" profile.mod
+fi
+
+
+
+sed -i "s,CTLOJA,CT$CTLOJA,g" profile.mod
+sed -i "s,NUMLOJA,$CTLOJA,g" profile.mod
+sed -i "s,SETOR,$grp_SETOR,g" profile.mod
+sed -i "s,IPADLOJA,10.$CTLOJA.1.9,g" profile.mod
+
+
+mv -v /Instalacao/profile.mod $HOME/.profile
+
+gedit $HOME/.profile

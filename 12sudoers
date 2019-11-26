@@ -1,0 +1,39 @@
+#!/bin/bash
+
+RKGRAY='\033[1;30m'
+eRED='\033[0;31;160m'
+RED='\033[37;41m'
+LIGHTRED='\033[1;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+LIGHTPURPLE='\033[1;35m'
+CYAN='\033[0;36m'
+WHITE='\033[1;37m'
+SET='\033[0m'
+contador=1
+while [ $contador -eq 1 ]; do 
+
+    echo "${RED} Digite a chapa do usuario ${SET}"
+    read chapa
+
+    if [ -z $x ];then
+        sudo echo "$chapa   ALL=(ALL) ALL, NOPASSWD: /bin/mount,/sbin/shutdown,/sbin/poweroff,/sbin/reboot,/bin/bash,/bin/sh,/Zanthus/Zeus/ctbiom/Biometria.sh,/Zanthus/Zeus/ctbiom/lnx_ctbiom.xz" >> /etc/sudoers
+        echo ${RED} Usuario adicionado!!!!! ${SET}        
+        echo ""
+        echo ""
+    else
+echo "Digite o login do usuario."        
+    fi
+
+    echo "Deseja inserir outro registro? S/N?"
+    read continua
+    if [ "$continua" = "n" ] || [ "$continua" = "N" ] ;then
+       exit
+    fi
+done
+
+sleep 1
+
+

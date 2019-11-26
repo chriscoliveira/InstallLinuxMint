@@ -1,0 +1,3 @@
+sudo umount -f $HOME/*
+cd $HOME
+. .profile

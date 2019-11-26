@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Landscape updated="2018-02-21T13:46:36Z" version="1" origin="file:$HOME/.SAPGUI/SAPGUILandscape.xml" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" generator="SAP GUI for Java 7.40 rev 4" xsi:noNamespaceSchemaLocation="SAPUILandscape.xsd">
+  <Services>
+    <Service name="TAS" expert="1" msid="" uuid="ea283181-7fce-495f-b088-2c4f62719ac4" type="SAPGUI" server="10.128.0.159:3200" mode="1"/>
+    <Service expert="1" name="TAS1" msid="" type="SAPGUI" uuid="09b24472-3172-4078-9635-78f03e4ae105" server="10.128.0.139:3200" mode="1"/>
+    <Service expert="1" name="QAS" msid="" type="SAPGUI" uuid="d257ec8f-cffd-49cf-8f26-44e099453ddc" server="10.128.1.160:3200" mode="1"/>
+  </Services>
+  <Workspaces default="59200af8-a020-4d3f-9dac-b836d13dc59c">
+    <Workspace expanded="1" name="JavaGUI Services" uuid="59200af8-a020-4d3f-9dac-b836d13dc59c" description="JavaGUI Services configuration">
+      <Item uuid="96765ba2-628f-40d0-8ac9-53b641231e46" serviceid="d257ec8f-cffd-49cf-8f26-44e099453ddc"/>
+      <Item uuid="cbd27603-7fc3-4e40-9b45-a0260b06636d" serviceid="09b24472-3172-4078-9635-78f03e4ae105"/>
+      <Item uuid="2bdb1043-a49c-4abf-8d12-27fa0e163cb9" serviceid="ea283181-7fce-495f-b088-2c4f62719ac4"/>
+    </Workspace>
+  </Workspaces>
+  <Messageservers/>
+  <Routers/>
+</Landscape>

@@ -1,0 +1,17 @@
+#!/bin/bash
+
+rm -f $HOME/montagem.txt
+df | awk '{print $1" " $6}' | grep // -> $HOME/montagem.txt
+
+i=$(cat $HOME/montagem.txt | wc -l)
+
+
+
+choice=$(zenity --list \
+                --checklist \
+                --column "selecione" $(cat $HOME/montagem.txt | awk -F' /' '{print $NF}') \
+                --width=300 \
+                --height=300 \
+                --column "Montagem" $(cat $HOME/montagem.txt | awk -F' /' '{print $NF}')
+                )
+sudo umount /$choice
